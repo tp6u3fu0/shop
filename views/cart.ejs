@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>購物車 - 線上商店平台</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header>
+    <h1>您的購物車</h1>
+</header>
+
+<div class="container">
+    <section id="cart" class="cart">
+        <h2>您的購物車</h2>
+        <% if (cart.length === 0) { %>
+            <p>目前沒有商品在購物車中</p>
+        <% } else { %>
+            <ul>
+                <% cart.forEach(function(item) { %>
+                    <li><%= item.name %> - $<%= item.price %> (數量: <%= item.quantity %>)</li>
+                <% }); %>
+            </ul>
+            <!-- 清空購物車的按鈕 -->
+            <form action="/cart/clear" method="POST">
+                <button type="submit">清空購物車</button>
+            </form>
+        <% } %>
+    </section>
+</div>
+
+<footer>
+    <p>線上商店平台 © 2024</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - 線上商店平台</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header>
+    <h1><%= title %></h1>
+</header>
+
+<nav>
+    <% if (username) { %> <!-- 檢查用戶是否登入 -->
+        <p>歡迎，<%= username %>！</p>
+        <% if (!isSeller) { %> <!-- 檢查用戶是否為賣家 -->
+            <form action="/become-seller" method="POST" style="display:inline;">
+                <button type="submit">成為賣家</button>
+            </form>
+        <% } %>
+        <form action="/logout" method="POST" style="display:inline;">
+            <button type="submit">登出</button>
+        </form>
+    <% } else { %>
+        <a href="/login">登入</a>
+        <a href="/register">註冊</a>
+    <% } %>
+    <a href="/cart">購物車</a>
+</nav>
+
+<div class="container">
+
+    <!-- 商品展示區域 -->
+    <section id="products">
+        <h2>商品列表</h2>
+        <div class="product-list">
+            <% products.forEach(function(product) { %>
+                <div class="product">
+                    <img src="<%= product.image %>" alt="<%= product.name %>">
+                    <h3><%= product.name %></h3>
+                    <p>價格：$<%= product.price %></p>
+                    <form action="/cart/add" method="POST">
+                        <input type="hidden" name="productId" value="<%= product.id %>">
+                        <button type="submit">加入購物車</button>
+                    </form>
+                    <!-- 刪除產品的按鈕 -->
+                    <form action="/products/delete/<%= product.id %>" method="POST" style="display:inline;">
+                        <button type="submit">刪除產品</button>
+                    </form>
+                </div>
+            <% }); %>
+        </div>
+    </section>
+
+    <!-- 添加商品的表單 -->
+    <section id="add-product">
+        <h2>添加商品</h2>
+        <form action="/products/add" method="POST">
+            <input type="text" name="name" placeholder="商品名稱" required>
+            <input type="number" name="price" placeholder="價格" required>
+            <input type="text" name="image" placeholder="圖片 URL" required>
+            <button type="submit">添加商品</button>
+        </form>
+    </section>
+
+</div>
+
+<footer>
+    <p>線上商店平台 © 2024</p>
+</footer>
+
+</body>
+</html>
