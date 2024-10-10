@@ -1,14 +1,19 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken'); // 引入jsonwebtoken
+const helmet = require('helmet');
 const app = express();
 app.set('view engine', 'ejs');
 app.set('views', './views');
 
 const session = require('express-session');
+const cookieParser = require('cookie-parser');
+app.use(cookieParser());
 
 let cart = []; // 儲存購物車的商品
 
+app.use(helmet());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
     secret: 'your_secret_key', // 用於加密會話的密鑰
@@ -88,13 +93,29 @@ app.post('/cart/clear', (req, res) => {
 });
 
 // 新增一個路由來插入商品資料
-app.post('/products/add' , async (req, res) => {
-    if (!req.session.userId || !req.session.isSeller) {
+// app.post('/products/add' , async (req, res) => {
+//     if (!req.session.userId || !req.session.isSeller) {
+//         return res.status(403).send('只有賣家才能上傳商品');
+//     }
+
+//     const { name, price } = req.body;
+    
+//     const newProduct = new Product({ name, price, image });
+
+//     try {
+//         await newProduct.save();
+//         res.status(201).send('商品已成功添加');
+//     } catch (err) {
+//         console.error(err);
+//         res.status(500).send('伺服器錯誤');
+//     }
+// });
+app.post('/products/add', authenticateJWT, async (req, res) => {
+    if (!req.user.isSeller || !req.user.userId) {
         return res.status(403).send('只有賣家才能上傳商品');
     }
 
-    const { name, price } = req.body;
-    
+    const { name, price , image} = req.body;
     const newProduct = new Product({ name, price, image });
 
     try {
@@ -106,9 +127,24 @@ app.post('/products/add' , async (req, res) => {
     }
 });
 
+
 // 刪除產品的路由
-app.post('/products/delete/:id', async (req, res) => {
-    if (!req.session.userId || !req.session.isSeller) {
+// app.post('/products/delete/:id', async (req, res) => {
+//     if (!req.session.userId || !req.session.isSeller) {
+//         return res.status(403).send('只有賣家才能刪除商品');
+//     }
+
+//     const productId = req.params.id; // 獲取產品 ID
+//     try {
+//         await Product.findByIdAndDelete(productId); // 刪除指定的產品
+//         res.redirect('/'); // 重新導向到產品列表頁面
+//     } catch (err) {
+//         console.error(err);
+//         res.status(500).send('伺服器錯誤');
+//     }
+// });
+app.post('/products/delete/:id', authenticateJWT, async (req, res) => {
+    if (!req.user.isSeller || !req.user.userId) {
         return res.status(403).send('只有賣家才能刪除商品');
     }
 
@@ -121,6 +157,8 @@ app.post('/products/delete/:id', async (req, res) => {
         res.status(500).send('伺服器錯誤');
     }
 });
+
+
 app.get('/register', (req, res) => {
     res.render('register', { title: '註冊' }); // 渲染註冊頁面
 });
@@ -132,26 +170,57 @@ app.post('/register', async (req, res) => {
     const newUser = new User({ username, password: hashedPassword });
     try {
         await newUser.save();
-        res.redirect('/login'); // 移除 res.status(201).send('註冊成功');
+        res.redirect('/login');
     } catch (err) {
         console.error(err);
         res.status(500).send('伺服器錯誤');
     }
 });
 
+// 登入功能
+// app.post('/login', async (req, res) => {
+//     const { username, password } = req.body;
+//     const user = await User.findOne({ username });
+
+//     if (user && await bcrypt.compare(password, user.password)) {
+//         const token = jwt.sign({ userId: user._id, isSeller: user.isSeller }, 'your_jwt_secret', { expiresIn: '1h' }); // 生成JWT
+//         res.cookie('token', token, { httpOnly: true }); // 將JWT存儲在cookie中
+//         res.redirect('/');
+//     } else {
+//         res.status(401).send('用戶名或密碼錯誤');
+//     }
+// });
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
     const user = await User.findOne({ username });
 
     if (user && await bcrypt.compare(password, user.password)) {
-        req.session.userId = user._id; // 設置會話
-        req.session.username = user.username; // 儲存用戶名到會話
-        req.session.isSeller = user.isSeller; // 確保這行存在
-        res.redirect('/'); // 登入成功後重定向到主頁
+        const token = jwt.sign({ userId: user._id, isSeller: user.isSeller }, 'your_jwt_secret', { expiresIn: '1h' }); // 生成JWT
+        res.cookie('token', token, { httpOnly: true }); // 將JWT存儲在cookie中
+        req.session.username = user.username; // 設置會話中的用戶名
+        req.session.isSeller = user.isSeller; // 設置會話中的賣家狀態
+        res.redirect('/');
     } else {
         res.status(401).send('用戶名或密碼錯誤');
     }
 });
+
+//JWT 驗證中間件
+function authenticateJWT(req, res, next) {
+    const token = req.cookies.token; // 從cookie中獲取token
+
+    if (token) {
+        jwt.verify(token, 'your_jwt_secret', (err, user) => {
+            if (err) {
+                return res.sendStatus(403);
+            }
+            req.user = user;
+            next();
+        });
+    } else {
+        res.sendStatus(401);
+    }
+}
 
 app.post('/logout', (req, res) => {
     req.session.destroy(err => {
@@ -163,13 +232,26 @@ app.post('/logout', (req, res) => {
     
 });
 
-app.post('/become-seller', async (req, res) => {
-    if (!req.session.userId) {
+// app.post('/become-seller', async (req, res) => {
+//     if (!req.session.userId) {
+//         return res.status(401).send('請先登入');
+//     }
+
+//     try {
+//         await User.findByIdAndUpdate(req.session.userId, { isSeller: true }); // 將用戶標記為賣家
+//         res.redirect('/'); // 移除 res.send('恭喜你，現在你是賣家了！');
+//     } catch (err) {
+//         console.error(err);
+//         res.status(500).send('伺服器錯誤');
+//     }
+// });
+app.post('/become-seller', authenticateJWT, async (req, res) => {
+    if (!req.user.userId) {
         return res.status(401).send('請先登入');
     }
 
     try {
-        await User.findByIdAndUpdate(req.session.userId, { isSeller: true }); // 將用戶標記為賣家
+        await User.findByIdAndUpdate(req.user.userId, { isSeller: true }); // 將用戶標記為賣家
         res.redirect('/'); // 移除 res.send('恭喜你，現在你是賣家了！');
     } catch (err) {
         console.error(err);
@@ -177,7 +259,32 @@ app.post('/become-seller', async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+const rateLimit = require('express-rate-limit'); // 引入 express-rate-limit
+// 設置速率限制
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 分鐘
+    max: 100, // 每個 IP 最多可以在 15 分鐘內發送 100 次請求
+    message: '請求過於頻繁，請稍後再試。' // 超過限制時的回應消息
+});
+
+app.use(limiter); // 在所有路由之前使用速率限制中間件
+
+
+// const PORT = 3001;
+// app.listen(PORT, () => {
+//     console.log(`Server is running on port ${PORT}`);
+// });
+
+const https = require('https');
+const fs = require('fs');
+
+const options = {
+    key: fs.readFileSync('server.key'),
+    cert: fs.readFileSync('server.cert')
+};
+
+const server = https.createServer(options, app);
+
+server.listen(3001, () => {
+    console.log('HTTPS 伺服器正在運行，端口 3001');
 });
