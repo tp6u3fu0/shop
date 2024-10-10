@@ -285,6 +285,6 @@ const options = {
 
 const server = https.createServer(options, app);
 
-server.listen(3001, () => {
-    console.log('HTTPS 伺服器正在運行，端口 3001');
+server.listen(3000, () => {
+    console.log('HTTPS 伺服器正在運行，端口 3000');
 });
