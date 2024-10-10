@@ -23,7 +23,7 @@ app.use(session({
 }));
 
 // 連接到 MongoDB
-mongoose.connect('mongodb+srv://tp6u3fu0:shepherdx1000@cluster0.vazi0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
+mongoose.connect('')
     .then(() => {
         console.log('MongoDB 連接成功');
     })
